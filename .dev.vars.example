@@ -1,0 +1,7 @@
+# Example environment variables for local development
+# Copy this file to .dev.vars (which is gitignored) and fill in your values
+
+# If you need any environment variables for local development,
+# add them here. For Workers AI and Durable Objects, bindings
+# are configured in wrangler.toml
+

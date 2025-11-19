@@ -1,0 +1,30 @@
+{
+  "name": "cloudflare-ai-app",
+  "version": "1.0.0",
+  "description": "AI-powered chat application on Cloudflare",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "ai",
+    "llm"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240125.0",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.34.0"
+  },
+  "dependencies": {
+    "hono": "^4.0.0"
+  }
+}
+
