@@ -75,10 +75,8 @@ export class ChatState {
       }
     });
 
-    server.send(JSON.stringify({
-      type: 'history',
-      messages: this.chatHistory,
-    }));
+    // Don't send history on connection - client will load it via HTTP
+    // This prevents duplicate messages when switching chats
 
     return new Response(null, {
       status: 101,

@@ -1,10 +1,12 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { ChatState } from './durable-objects/chat-state';
+import { UserChats } from './durable-objects/user-chats';
 
 export interface Env {
   AI: any;
   CHAT_STATE: DurableObjectNamespace;
+  USER_CHATS: DurableObjectNamespace;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -32,23 +34,112 @@ app.get('/', async (c) => {
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #ffffff;
+            background: #f5f5f5;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .app-container {
+            width: 100%;
             height: 100vh;
             display: flex;
-            justify-content: center;
-            align-items: center;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: white;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .sidebar-header {
             padding: 20px;
+            background: linear-gradient(135deg, #F48120 0%, #FAAD3F 100%);
+            color: white;
+        }
+
+        .sidebar-header h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .new-chat-button {
+            margin: 15px;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #F48120 0%, #FAAD3F 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .new-chat-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(244, 129, 32, 0.3);
+        }
+
+        .chat-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .chat-item {
+            padding: 12px 15px;
+            margin-bottom: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .chat-item:hover {
+            background: #f5f5f5;
+        }
+
+        .chat-item.active {
+            background: rgba(244, 129, 32, 0.1);
+            border-color: #F48120;
+        }
+
+        .chat-item-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chat-item-preview {
+            font-size: 12px;
+            color: #666;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .chat-item-time {
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
         }
 
         .chat-container {
-            width: 100%;
-            max-width: 800px;
-            height: 90vh;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(244, 129, 32, 0.3);
+            flex: 1;
             display: flex;
             flex-direction: column;
+            background: white;
             overflow: hidden;
         }
 
@@ -227,38 +318,49 @@ app.get('/', async (c) => {
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">
-            🤖 Cloudflare AI Chat
-        </div>
-        <div class="chat-messages" id="chatMessages">
-            <div class="message assistant">
-                <div>Hello! I'm your AI assistant powered by Cloudflare Workers AI. How can I help you today?</div>
-                <div class="message-time">Just now</div>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>🤖 Cloudflare AI</h1>
             </div>
-            <div class="typing-indicator" id="typingIndicator">
-                <div class="typing-dots">
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
-                    <div class="typing-dot"></div>
+            <button class="new-chat-button" id="newChatButton">+ New Chat</button>
+            <div class="chat-list" id="chatList">
+                <!-- Chat items will be inserted here -->
+            </div>
+        </div>
+        <div class="chat-container">
+            <div class="chat-header">
+                <span id="currentChatTitle">New Chat</span>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+                    <div>Hello! I'm your AI assistant powered by Cloudflare Workers AI. How can I help you today?</div>
+                    <div class="message-time">Just now</div>
+                </div>
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="status-indicator">
-            <div class="status-dot" id="statusDot"></div>
-            <span id="statusText">Connecting...</span>
-        </div>
-        <div class="chat-input-container">
-            <form class="chat-input-form" id="chatForm">
-                <input 
-                    type="text" 
-                    class="chat-input" 
-                    id="chatInput" 
-                    placeholder="Type your message..."
-                    autocomplete="off"
-                />
-                <button type="submit" class="send-button" id="sendButton">Send</button>
-            </form>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+            <div class="chat-input-container">
+                <form class="chat-input-form" id="chatForm">
+                    <input 
+                        type="text" 
+                        class="chat-input" 
+                        id="chatInput" 
+                        placeholder="Type your message..."
+                        autocomplete="off"
+                    />
+                    <button type="submit" class="send-button" id="sendButton">Send</button>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -268,8 +370,10 @@ app.get('/', async (c) => {
                 this.apiUrl = window.location.origin.includes('localhost') 
                     ? window.location.origin
                     : window.location.origin;
-                this.sessionId = this.getSessionId();
                 this.userId = this.getUserId();
+                this.sessionId = null;
+                this.currentChat = null;
+                this.chats = [];
                 this.ws = null;
                 this.isConnected = false;
                 
@@ -280,17 +384,16 @@ app.get('/', async (c) => {
                 this.statusDot = document.getElementById('statusDot');
                 this.statusText = document.getElementById('statusText');
                 this.typingIndicator = document.getElementById('typingIndicator');
+                this.chatList = document.getElementById('chatList');
+                this.newChatButton = document.getElementById('newChatButton');
+                this.currentChatTitle = document.getElementById('currentChatTitle');
 
                 this.init();
             }
 
-            getSessionId() {
-                let sessionId = sessionStorage.getItem('chatSessionId');
-                if (!sessionId) {
-                    sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    sessionStorage.setItem('chatSessionId', sessionId);
-                }
-                return sessionId;
+            setSessionId(sessionId) {
+                this.sessionId = sessionId;
+                sessionStorage.setItem('chatSessionId', sessionId);
             }
 
             getUserId() {
@@ -303,12 +406,19 @@ app.get('/', async (c) => {
             }
 
             async init() {
-                this.connectWebSocket();
                 this.setupEventListeners();
-                await this.loadHistory();
+                await this.loadChats();
+                // Create or load first chat
+                if (this.chats.length === 0) {
+                    await this.createNewChat();
+                } else {
+                    await this.switchToChat(this.chats[0].sessionId);
+                }
             }
 
             connectWebSocket() {
+                if (!this.sessionId) return;
+                
                 try {
                     const wsUrl = (this.apiUrl.replace('http', 'ws') || 'ws://localhost:8787') + '/api/ws/' + this.sessionId;
                     this.ws = new WebSocket(wsUrl);
@@ -322,9 +432,25 @@ app.get('/', async (c) => {
                     this.ws.onmessage = (event) => {
                         const data = JSON.parse(event.data);
                         if (data.type === 'message') {
-                            this.addMessage(data.message);
+                            // Only add message if it's not already in the chat (check by timestamp and content)
+                            const messageExists = Array.from(this.chatMessages.querySelectorAll('.message')).some(msg => {
+                                const timeDiv = msg.querySelector('.message-time');
+                                if (timeDiv && data.message.timestamp) {
+                                    // Check if message with same timestamp exists
+                                    return false; // We'll add it anyway, but check for duplicates
+                                }
+                                return false;
+                            });
+                            if (!messageExists) {
+                                this.addMessage(data.message);
+                            }
                         } else if (data.type === 'history') {
-                            this.loadMessages(data.messages);
+                            // Don't load history via WebSocket if we just loaded it via HTTP
+                            // Only load if chat is empty
+                            const existingMessages = this.chatMessages.querySelectorAll('.message');
+                            if (existingMessages.length <= 1) { // Only welcome message
+                                this.loadMessages(data.messages);
+                            }
                         }
                     };
 
@@ -346,14 +472,14 @@ app.get('/', async (c) => {
             }
 
             setupEventListeners() {
-                console.log('Setting up event listeners');
-                console.log('chatForm:', this.chatForm);
-                console.log('chatInput:', this.chatInput);
-                
                 if (!this.chatForm) {
                     console.error('chatForm element not found!');
                     return;
                 }
+                
+                this.newChatButton.addEventListener('click', () => {
+                    this.createNewChat();
+                });
                 
                 this.chatForm.addEventListener('submit', async (e) => {
                     console.log('Form submitted');
@@ -404,6 +530,9 @@ app.get('/', async (c) => {
                 };
                 this.addMessage(userMsg);
                 this.showTypingIndicator();
+                
+                // Update chat metadata with user message
+                await this.updateChatMetadata(userMsg);
 
                 console.log('Using HTTP API (WebSocket disabled for debugging)');
                 try {
@@ -443,6 +572,8 @@ app.get('/', async (c) => {
                         console.log('Got assistant message:', data.assistantMessage.content);
                         this.hideTypingIndicator();
                         this.addMessage(data.assistantMessage);
+                        // Update chat metadata
+                        await this.updateChatMetadata(data.assistantMessage);
                     } else if (data.error) {
                         console.error('Response contains error:', data.error);
                         this.hideTypingIndicator();
@@ -475,12 +606,157 @@ app.get('/', async (c) => {
                 console.log('=== sendMessage END ===');
             }
 
+            async loadChats() {
+                try {
+                    const response = await fetch(this.apiUrl + '/api/chats/list?userId=' + this.userId);
+                    const data = await response.json();
+                    if (data.chats) {
+                        this.chats = data.chats;
+                        this.renderChatList();
+                    }
+                } catch (error) {
+                    console.error('Failed to load chats:', error);
+                }
+            }
+
+            async createNewChat() {
+                try {
+                    const response = await fetch(this.apiUrl + '/api/chats/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            userId: this.userId,
+                        }),
+                    });
+
+                    const data = await response.json();
+                    if (data.chat) {
+                        this.chats.unshift(data.chat);
+                        this.renderChatList();
+                        await this.switchToChat(data.chat.sessionId);
+                    }
+                } catch (error) {
+                    console.error('Failed to create chat:', error);
+                }
+            }
+
+            async switchToChat(sessionId) {
+                this.setSessionId(sessionId);
+                this.currentChat = this.chats.find(c => c.sessionId === sessionId);
+                
+                if (this.currentChat) {
+                    this.currentChatTitle.textContent = this.currentChat.title;
+                }
+                
+                // Close existing WebSocket
+                if (this.ws) {
+                    this.ws.onmessage = null; // Remove message handler to prevent duplicate messages
+                    this.ws.close();
+                    this.ws = null;
+                    this.isConnected = false;
+                }
+                
+                // Clear messages but keep typing indicator structure
+                const typingIndicator = this.typingIndicator.outerHTML;
+                this.chatMessages.innerHTML = '';
+                this.chatMessages.insertAdjacentHTML('beforeend', typingIndicator);
+                this.typingIndicator = document.getElementById('typingIndicator');
+                
+                // Load history for this chat (don't connect WebSocket - we'll do that after)
+                await this.loadHistory();
+                
+                // Small delay to ensure history is loaded before WebSocket connects
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // Connect WebSocket for new session
+                this.connectWebSocket();
+                
+                // Update active chat in sidebar
+                this.renderChatList();
+            }
+
+            renderChatList() {
+                this.chatList.innerHTML = '';
+                
+                this.chats.forEach(chat => {
+                    const chatItem = document.createElement('div');
+                    chatItem.className = 'chat-item';
+                    if (this.currentChat && chat.sessionId === this.currentChat.sessionId) {
+                        chatItem.classList.add('active');
+                    }
+                    
+                    chatItem.addEventListener('click', () => {
+                        this.switchToChat(chat.sessionId);
+                    });
+                    
+                    const title = document.createElement('div');
+                    title.className = 'chat-item-title';
+                    title.textContent = chat.title;
+                    
+                    const preview = document.createElement('div');
+                    preview.className = 'chat-item-preview';
+                    preview.textContent = chat.lastMessage || 'No messages yet';
+                    
+                    const time = document.createElement('div');
+                    time.className = 'chat-item-time';
+                    if (chat.lastMessageTime) {
+                        time.textContent = this.formatTime(chat.lastMessageTime);
+                    } else {
+                        time.textContent = this.formatTime(chat.createdAt);
+                    }
+                    
+                    chatItem.appendChild(title);
+                    chatItem.appendChild(preview);
+                    chatItem.appendChild(time);
+                    this.chatList.appendChild(chatItem);
+                });
+            }
+
+            async updateChatMetadata(message) {
+                if (!this.currentChat || !message || !message.content) return;
+                
+                try {
+                    const lastMessage = message.content ? message.content.substring(0, 50) : '';
+                    await fetch(this.apiUrl + '/api/chats/update?userId=' + this.userId + '&sessionId=' + this.sessionId, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            lastMessage: lastMessage,
+                            messageCount: (this.currentChat.messageCount || 0) + 1,
+                        }),
+                    });
+                    
+                    // Reload chats to get updated data
+                    await this.loadChats();
+                } catch (error) {
+                    console.error('Failed to update chat metadata:', error);
+                }
+            }
+
             async loadHistory() {
+                if (!this.sessionId) return;
+                
                 try {
                     const response = await fetch(this.apiUrl + '/api/chat/history/' + this.sessionId);
                     const data = await response.json();
                     if (data.messages && data.messages.length > 0) {
                         this.loadMessages(data.messages);
+                    } else {
+                        // Show welcome message if no history
+                        const welcomeMsg = document.createElement('div');
+                        welcomeMsg.className = 'message assistant';
+                        const welcomeContent = document.createElement('div');
+                        welcomeContent.textContent = 'Hello! I\\'m your AI assistant powered by Cloudflare Workers AI. How can I help you today?';
+                        const welcomeTime = document.createElement('div');
+                        welcomeTime.className = 'message-time';
+                        welcomeTime.textContent = 'Just now';
+                        welcomeMsg.appendChild(welcomeContent);
+                        welcomeMsg.appendChild(welcomeTime);
+                        this.chatMessages.insertBefore(welcomeMsg, this.typingIndicator);
                     }
                 } catch (error) {
                     console.error('Failed to load history:', error);
@@ -488,12 +764,22 @@ app.get('/', async (c) => {
             }
 
             loadMessages(messages) {
-                const existingMessages = this.chatMessages.querySelectorAll('.message:not(.assistant)');
-                existingMessages.forEach(msg => msg.remove());
+                // Clear all messages except typing indicator
+                const typingIndicator = this.typingIndicator;
+                this.chatMessages.innerHTML = '';
+                this.chatMessages.appendChild(typingIndicator);
+                this.typingIndicator = typingIndicator;
 
+                // Add messages, avoiding duplicates
+                const addedTimestamps = new Set();
                 messages.forEach(msg => {
                     if (msg.role !== 'system') {
-                        this.addMessage(msg, false);
+                        // Use timestamp + content as unique key to prevent duplicates
+                        const msgKey = msg.timestamp + '_' + msg.content.substring(0, 20);
+                        if (!addedTimestamps.has(msgKey)) {
+                            addedTimestamps.add(msgKey);
+                            this.addMessage(msg, false);
+                        }
                     }
                 });
 
@@ -501,6 +787,21 @@ app.get('/', async (c) => {
             }
 
             addMessage(message, scroll = true) {
+                // Check if message already exists to prevent duplicates
+                const existingMessages = this.chatMessages.querySelectorAll('.message');
+                for (const existing of existingMessages) {
+                    const timeDiv = existing.querySelector('.message-time');
+                    const contentDiv = existing.querySelector('div:first-child');
+                    if (timeDiv && contentDiv && 
+                        contentDiv.textContent === message.content) {
+                        const existingTimestamp = parseInt(timeDiv.getAttribute('data-timestamp') || '0');
+                        if (Math.abs(existingTimestamp - message.timestamp) < 1000) {
+                            // Message already exists, don't add again
+                            return;
+                        }
+                    }
+                }
+                
                 const messageDiv = document.createElement('div');
                 messageDiv.className = 'message ' + message.role;
                 
@@ -511,6 +812,7 @@ app.get('/', async (c) => {
                 const timeDiv = document.createElement('div');
                 timeDiv.className = 'message-time';
                 timeDiv.textContent = this.formatTime(message.timestamp);
+                timeDiv.setAttribute('data-timestamp', message.timestamp.toString());
                 messageDiv.appendChild(timeDiv);
 
                 this.hideTypingIndicator();
@@ -677,6 +979,112 @@ app.get('/api/ws/:sessionId', async (c) => {
   }
 });
 
+// Chat management endpoints
+app.get('/api/chats/list', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    if (!userId) {
+      return c.json({ error: 'userId is required' }, 400);
+    }
+
+    const id = c.env.USER_CHATS.idFromName(userId);
+    const userChats = c.env.USER_CHATS.get(id);
+
+    const response = await userChats.fetch(c.req.raw, {
+      method: 'GET',
+    });
+
+    return response;
+  } catch (error: any) {
+    console.error('List chats error:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+app.post('/api/chats/create', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, sessionId, title } = body;
+
+    if (!userId) {
+      return c.json({ error: 'userId is required' }, 400);
+    }
+
+    const id = c.env.USER_CHATS.idFromName(userId);
+    const userChats = c.env.USER_CHATS.get(id);
+
+    const response = await userChats.fetch(c.req.raw, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sessionId, title, userId }),
+    });
+
+    return response;
+  } catch (error: any) {
+    console.error('Create chat error:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+app.put('/api/chats/update', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    const sessionId = c.req.query('sessionId');
+    const body = await c.req.json();
+
+    if (!userId || !sessionId) {
+      return c.json({ error: 'userId and sessionId are required' }, 400);
+    }
+
+    const id = c.env.USER_CHATS.idFromName(userId);
+    const userChats = c.env.USER_CHATS.get(id);
+
+    const url = new URL(c.req.url);
+    url.searchParams.set('sessionId', sessionId);
+
+    const response = await userChats.fetch(new Request(url.toString(), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    }));
+
+    return response;
+  } catch (error: any) {
+    console.error('Update chat error:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+app.delete('/api/chats/delete', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    const sessionId = c.req.query('sessionId');
+
+    if (!userId || !sessionId) {
+      return c.json({ error: 'userId and sessionId are required' }, 400);
+    }
+
+    const id = c.env.USER_CHATS.idFromName(userId);
+    const userChats = c.env.USER_CHATS.get(id);
+
+    const url = new URL(c.req.url);
+    url.searchParams.set('sessionId', sessionId);
+
+    const response = await userChats.fetch(new Request(url.toString(), {
+      method: 'DELETE',
+    }));
+
+    return response;
+  } catch (error: any) {
+    console.error('Delete chat error:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
 export default app;
 
-export { ChatState };
+export { ChatState, UserChats };
