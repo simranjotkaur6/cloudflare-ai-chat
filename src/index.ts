@@ -3,6 +3,9 @@ import { cors } from 'hono/cors';
 import { ChatState } from './durable-objects/chat-state';
 import { UserChats } from './durable-objects/user-chats';
 
+// Export Durable Objects at the top level for Cloudflare Workers
+export { ChatState, UserChats };
+
 export interface Env {
   AI: any;
   CHAT_STATE: DurableObjectNamespace;
@@ -1086,5 +1089,3 @@ app.delete('/api/chats/delete', async (c) => {
 });
 
 export default app;
-
-export { ChatState, UserChats };
